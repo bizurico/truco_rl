@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "1054134218630",
+    "firebase_url": "https://fodinha-project-de0dd-default-rtdb.firebaseio.com",
+    "project_id": "fodinha-project-de0dd",
+    "storage_bucket": "fodinha-project-de0dd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054134218630:android:23e1cc3eea943a88474607",
+        "android_client_info": {
+          "package_name": "com.example.fodinha"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAveecWA_p43XutFhCn-moezXKI89x5wsw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054134218630:android:a5c0c7378395b1cb474607",
+        "android_client_info": {
+          "package_name": "com.example.truco_rl"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAveecWA_p43XutFhCn-moezXKI89x5wsw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

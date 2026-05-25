@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'instrucoes.dart';
+// Vamos criar este em seguida
 import 'lobby_screen.dart';
 
 class TelaInicial extends StatefulWidget {
@@ -19,56 +19,51 @@ class _TelaInicialState extends State<TelaInicial> {
     String nome = _nomeController.text.trim();
     String sala = _salaController.text.trim();
 
-    if (nome.isEmpty || sala.isEmpty) return;
-
-    DatabaseReference salaRef = FirebaseDatabase.instance.ref("salas/$sala");
-
-    if (isCriando) {
-      // Cria a sala e define o status inicial
-      await salaRef.set({
-        'status': 'aguardando',
-        'jogadores': {
-          nome: {'pontos': 0, 'palpite': -1},
-        },
-      });
-    } else {
-      // Apenas adiciona o jogador na sala existente
-      await salaRef.child("jogadores/$nome").set({'pontos': 0, 'palpite': -1});
+    if (nome.isEmpty || sala.isEmpty) {
+      print('ERRO: nome ou sala vazios');
+      return;
     }
 
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LobbyScreen(
-          salaId: sala,
-          meuNome: nome,
-          souHost: isCriando, // Se está criando, é o host!
+    print('Tentando conectar ao Firebase...');
+    
+    try {
+      DatabaseReference salaRef = FirebaseDatabase.instance.ref("salas/$sala");
+      print('Referência criada: salas/$sala');
+
+      if (isCriando) {
+        print('Criando sala...');
+        await salaRef.set({
+          'status': 'aguardando',
+          'jogadores': {
+            nome: {'pontos': 0, 'palpite': -1, 'vidas': 10},
+          },
+        });
+        print('Sala criada com sucesso!');
+      } else {
+        print('Entrando na sala...');
+        await salaRef.child("jogadores/$nome").set({'pontos': 0, 'palpite': -1, 'vidas': 10});
+        print('Entrou na sala com sucesso!');
+      }
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LobbyScreen(
+            salaId: sala,
+            meuNome: nome,
+            souHost: isCriando,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      print('ERRO Firebase: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber, // Fundo amarelo
-        shape: const CircleBorder(), // Garante que seja perfeitamente redondo
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const InstrucoesScreen()),
-          );
-        },
-        child: const Icon(
-          Icons.question_mark,
-          color: Color(
-            0xFF1B5E20,
-          ), // Interrogação no tom de verde escuro do jogo
-          size: 32,
-        ),
-      ),
       body: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(

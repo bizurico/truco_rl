@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-// Vamos criar este em seguida
+import 'instrucoes.dart';
 import 'lobby_screen.dart';
 
 class TelaInicial extends StatefulWidget {
@@ -52,6 +52,23 @@ class _TelaInicialState extends State<TelaInicial> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.amber, // Fundo amarelo
+        shape: const CircleBorder(), // Garante que seja perfeitamente redondo
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const InstrucoesScreen()),
+          );
+        },
+        child: const Icon(
+          Icons.question_mark,
+          color: Color(
+            0xFF1B5E20,
+          ), // Interrogação no tom de verde escuro do jogo
+          size: 32,
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(

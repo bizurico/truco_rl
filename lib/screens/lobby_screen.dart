@@ -20,8 +20,14 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
-  final TextEditingController _pontosCustomController = TextEditingController();
-  int pontosParaEliminar = 10; // Valor padrão
+  final TextEditingController _pontosCustomController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _pontosCustomController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +36,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF061612), // Cor do protótipo
+      backgroundColor: const Color(0xFF061612),
       appBar: AppBar(
         title: Text("SALA: ${widget.salaId}"),
         backgroundColor: Colors.transparent,
@@ -38,33 +44,27 @@ class _LobbyScreenState extends State<LobbyScreen> {
       body: StreamBuilder(
         stream: salaRef.onValue,
         builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+          if (!snapshot.hasData ||
+              snapshot.data!.snapshot.value == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
           Map dados = snapshot.data!.snapshot.value as Map;
+
           if (dados['status'] == 'jogando') {
-            // O addPostFrameCallback garante que o Flutter termine de
-            // ler o banco antes de forçar a troca de tela (evita tela vermelha)
             WidgetsBinding.instance.addPostFrameCallback((_) async {
               DatabaseReference salaRef = FirebaseDatabase.instance
                   .ref()
                   .child('salas')
                   .child(widget.salaId);
 
-              // 1. Puxa os dados da sala uma vez antes de entrar
               DataSnapshot snapshot = await salaRef.get();
 
               if (snapshot.exists) {
                 Map data = snapshot.value as Map;
                 Map? jogadores = data['jogadores'];
-
-                // 2. A PERÍCIA: Se a sala existe mas a lista de jogadores está vazia ou nula
                 if (jogadores == null || jogadores.isEmpty) {
-                  // Apaga a carcaça da sala antiga para começar do zero
                   await salaRef.remove();
-
-                  // Agora ela está limpa para ser "criada" novamente sem lixo
                 }
               }
 
@@ -80,12 +80,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
               );
             });
 
-            // Enquanto ele troca de tela, mostramos um loading verde
             return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF00FF9D)),
+              child: CircularProgressIndicator(
+                  color: Color(0xFF00FF9D)),
             );
           }
-          // ==========================================
 
           Map jogadores = dados['jogadores'] ?? {};
           int metaAtual = dados['meta_pontos'] ?? 10;
@@ -95,13 +94,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
             padding: const EdgeInsets.all(20.0),
             child: Column(
               children: [
+                // Card do nome da sala
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(
-                      alpha: 0.05,
-                    ), // Fundo translúcido sutil
+                    color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -130,23 +128,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          // Botão de copiar (estilo protótipo)
                           IconButton(
-                            icon: const Icon(
-                              Icons.copy,
-                              color: Color(0xFF00FF9D),
-                            ),
+                            icon: const Icon(Icons.copy,
+                                color: Color(0xFF00FF9D)),
                             onPressed: () {
-                              // Aqui você pode adicionar a funcionalidade de copiar depois!
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
                                 const SnackBar(
-                                  content: Text("Código da sala copiado!"),
+                                  content: Text(
+                                      "Código da sala copiado!"),
                                   backgroundColor: Color.fromARGB(
-                                    255,
-                                    91,
-                                    189,
-                                    255,
-                                  ),
+                                      255, 91, 189, 255),
                                 ),
                               );
                             },
@@ -158,35 +150,72 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ),
 
                 const SizedBox(height: 30),
-                // Configuração de Pontos (Apenas para o Host)
+
+                // Configurações (apenas host)
                 if (widget.souHost) ...[
                   const Text(
                     "LIMITE DE PONTOS PARA ELIMINAÇÃO",
                     style: TextStyle(color: Colors.white70),
                   ),
+                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ChoiceChip(
                         label: const Text("5"),
-                        selected: metaAtual == 5,
-                        onSelected: (_) => salaRef.update({'meta_pontos': 5}),
+                        selected: metaAtual == 5 &&
+                            _pontosCustomController.text.isEmpty,
+                        onSelected: (_) {
+                          _pontosCustomController.clear();
+                          setState(() {});
+                          salaRef.update({'meta_pontos': 5});
+                        },
                       ),
                       const SizedBox(width: 10),
                       ChoiceChip(
                         label: const Text("10"),
-                        selected: metaAtual == 10,
-                        onSelected: (_) => salaRef.update({'meta_pontos': 10}),
+                        selected: metaAtual == 10 &&
+                            _pontosCustomController.text.isEmpty,
+                        onSelected: (_) {
+                          _pontosCustomController.clear();
+                          setState(() {});
+                          salaRef.update({'meta_pontos': 10});
+                        },
                       ),
                       const SizedBox(width: 10),
                       SizedBox(
-                        width: 60,
+                        width: 80,
                         child: TextField(
                           controller: _pontosCustomController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(hintText: "Outro"),
-                          onSubmitted: (val) =>
-                              salaRef.update({'meta_pontos': int.parse(val)}),
+                          decoration: InputDecoration(
+                            hintText: "Outro",
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _pontosCustomController
+                                        .text.isNotEmpty
+                                    ? Colors.amber
+                                    : Colors.white24,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(
+                                  color: Colors.amber),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
+                          ),
+                          onChanged: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed > 0) {
+                              salaRef
+                                  .update({'meta_pontos': parsed});
+                            }
+                            setState(() {});
+                          },
                         ),
                       ),
                     ],
@@ -199,7 +228,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 1. Mostra "1 Baralho" SOMENTE se tiver menos de 6 jogadores
                       if (jogadores.length < 6)
                         ChoiceChip(
                           label: const Text("1 Baralho"),
@@ -207,12 +235,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           onSelected: (_) =>
                               salaRef.update({'qtd_baralhos': 1}),
                         ),
-
-                      // 2. Espaçamento condicional (só aparece se os dois botões estiverem na tela)
-                      if (jogadores.length >= 4 && jogadores.length < 6)
+                      if (jogadores.length >= 4 &&
+                          jogadores.length < 6)
                         const SizedBox(width: 10),
-
-                      // 3. Mostra "2 Baralhos" SOMENTE se tiver 4 ou mais jogadores
                       if (jogadores.length >= 4)
                         ChoiceChip(
                           label: const Text("2 Baralhos"),
@@ -225,39 +250,41 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ] else ...[
                   Text(
                     "META DE PONTOS: $metaAtual",
-                    style: const TextStyle(color: Colors.amber, fontSize: 18),
+                    style: const TextStyle(
+                        color: Colors.amber, fontSize: 18),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     "BARALHOS NA MESA: $qtdBaralhos",
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: const TextStyle(
+                        color: Colors.white70, fontSize: 14),
                   ),
                 ],
+
                 const Divider(color: Colors.white24, height: 40),
+
                 Text(
                   "JOGADORES (${jogadores.length}/4)",
-                  style: const TextStyle(color: Colors.white, fontSize: 20),
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 20),
                 ),
 
-                // Lista de Jogadores conectada ao Firebase
                 Expanded(
                   child: ListView(
                     children: jogadores.keys
                         .map(
                           (nome) => ListTile(
-                            leading: const Icon(
-                              Icons.person,
-                              color: Color(0xFF00FF9D),
-                            ),
+                            leading: const Icon(Icons.person,
+                                color: Color(0xFF00FF9D)),
                             title: Text(
                               nome.toString(),
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(
+                                  color: Colors.white),
                             ),
                             trailing: nome == widget.meuNome
-                                ? const Text(
-                                    "(Você)",
-                                    style: TextStyle(color: Colors.white54),
-                                  )
+                                ? const Text("(Você)",
+                                    style: TextStyle(
+                                        color: Colors.white54))
                                 : null,
                           ),
                         )
@@ -265,7 +292,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                 ),
 
-                // Botão de Iniciar (Só aparece para o Host e quando o status for aguardando)
+                // Botão iniciar (só host)
                 if (widget.souHost && dados['status'] == 'aguardando')
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -273,14 +300,22 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () async {
-                      List<String> nomes = jogadores.keys
-                          .cast<String>()
-                          .toList();
+                      List<String> nomes =
+                          jogadores.keys.cast<String>().toList();
+
+                      // Aplica a meta_pontos como vidas iniciais de todos
+                      Map<String, dynamic> vidasUpdate = {};
+                      for (String nome in nomes) {
+                        vidasUpdate['jogadores/$nome/vidas'] =
+                            metaAtual;
+                      }
+                      await salaRef.update(vidasUpdate);
+
                       await DealerService.iniciarNovaRodada(
                         widget.salaId,
                         nomes,
                         qtdBaralhos,
-                        1, // Começamos na rodada 1, onde se distribui 4 cartas
+                        1,
                       );
                       await salaRef.update({'status': 'jogando'});
                     },

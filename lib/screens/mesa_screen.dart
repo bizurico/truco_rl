@@ -21,20 +21,17 @@ class MesaScreen extends StatefulWidget {
 class _MesaScreenState extends State<MesaScreen> {
   late DatabaseReference salaRef;
 
-  /// Controla se a animação de embaralhar está ativa.
   bool _embaralhando = false;
-
-  /// Guarda a última vira vista para detectar mudança de rodada.
   String? _ultimaViraKey;
+
+  /// Índice da carta selecionada na mão (-1 = nenhuma)
+  int _cartaSelecionadaIndex = -1;
 
   @override
   void initState() {
     super.initState();
     salaRef = FirebaseDatabase.instance.ref("salas/${widget.salaId}");
-    salaRef
-        .child('jogadores/${widget.meuNome}')
-        .onDisconnect()
-        .remove();
+    salaRef.child('jogadores/${widget.meuNome}').onDisconnect().remove();
   }
 
   // ─── Saída da sala ─────────────────────────────────────────────────────────
@@ -42,13 +39,11 @@ class _MesaScreenState extends State<MesaScreen> {
   Future<void> _sairDaSala() async {
     await salaRef.child('jogadores/${widget.meuNome}').remove();
     final snap = await salaRef.child('jogadores').get();
-    if (!snap.exists || snap.value == null) {
-      await salaRef.remove();
-    }
+    if (!snap.exists || snap.value == null) await salaRef.remove();
     if (mounted) Navigator.of(context).pop();
   }
 
-  // ─── Lógica de palpite ──────────────────────────────────────────────────────
+  // ─── Palpite ────────────────────────────────────────────────────────────────
 
   void _confirmarPalpite(int palpite, List<String> ordem, int rodada) async {
     int meuIndex = ordem.indexOf(widget.meuNome);
@@ -69,14 +64,18 @@ class _MesaScreenState extends State<MesaScreen> {
     await salaRef.update(updates);
   }
 
-  // ─── Lógica de jogar carta ──────────────────────────────────────────────────
+  // ─── Jogar carta ────────────────────────────────────────────────────────────
 
   void _jogarCarta(
     Carta carta,
     int indexNaMao,
     List<dynamic> maoAtualRaw,
     List<String> ordem,
+    int metaPontos,
   ) async {
+    // Reseta seleção ao jogar
+    setState(() => _cartaSelecionadaIndex = -1);
+
     List<dynamic> maoAtual = List.from(maoAtualRaw);
     maoAtual.removeAt(indexNaMao);
 
@@ -147,13 +146,16 @@ class _MesaScreenState extends State<MesaScreen> {
         Map salaData2 = salaSnap2.value as Map;
         Map jogadoresData2 = salaData2['jogadores'] ?? {};
 
+        // BUG FIX: lê a meta_pontos do Firebase para usar como limite
+        final int metaAtual = (salaData2['meta_pontos'] as int?) ?? metaPontos;
+
         Map<String, dynamic> balancoUpdates = {};
         List<String> sobreviventes = [];
 
         jogadoresData2.forEach((nome, dadosJogador) {
           int palpite = dadosJogador['palpite'] ?? 0;
           int feitas = dadosJogador['vazas_feitas'] ?? 0;
-          int vidasAtuais = dadosJogador['vidas'] ?? 10;
+          int vidasAtuais = dadosJogador['vidas'] ?? metaAtual;
           int diferenca = (palpite - feitas).abs();
           int vidasRestantes = vidasAtuais - diferenca;
 
@@ -180,9 +182,7 @@ class _MesaScreenState extends State<MesaScreen> {
           balancoUpdates["rodada_atual"] = rodadaAtual + 1;
           await salaRef.update(balancoUpdates);
 
-          // Aciona a animação de embaralhar antes de distribuir
           if (mounted) setState(() => _embaralhando = true);
-
           await Future.delayed(const Duration(milliseconds: 1600));
 
           await DealerService.iniciarNovaRodada(
@@ -201,7 +201,7 @@ class _MesaScreenState extends State<MesaScreen> {
     }
   }
 
-  // ─── Build principal ────────────────────────────────────────────────────────
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -233,9 +233,12 @@ class _MesaScreenState extends State<MesaScreen> {
               dados['jogadores'] ?? {};
           final Map<dynamic, dynamic> cartasNaMesa =
               dados['mesa'] ?? {};
-
-          // ── Game Over ───────────────────────────────────────────────────────
           final String fase = dados['fase'] ?? 'palpites';
+
+          // BUG FIX: lê meta_pontos do Firebase
+          final int metaPontos = (dados['meta_pontos'] as int?) ?? 10;
+
+          // ── Game Over ─────────────────────────────────────────────────────
           if (fase == 'game_over') {
             final String vencedor = dados['vencedor'] ?? 'Desconhecido';
             final bool euVenci = vencedor == widget.meuNome;
@@ -253,10 +256,9 @@ class _MesaScreenState extends State<MesaScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "Grande Campeão:",
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
-                  ),
+                  const Text("Grande Campeão:",
+                      style:
+                          TextStyle(color: Colors.white70, fontSize: 18)),
                   Text(
                     vencedor,
                     style: const TextStyle(
@@ -276,7 +278,8 @@ class _MesaScreenState extends State<MesaScreen> {
                     child: const Text(
                       "VOLTAR AO LOBBY",
                       style: TextStyle(
-                          color: Colors.black, fontWeight: FontWeight.bold),
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -284,7 +287,7 @@ class _MesaScreenState extends State<MesaScreen> {
             );
           }
 
-          // ── Dados do jogo ───────────────────────────────────────────────────
+          // ── Dados do jogo ──────────────────────────────────────────────────
           final List<dynamic> ordemRaw =
               dados['ordem_jogadores'] ?? jogadores.keys.toList();
           final List<String> ordemJogadores = ordemRaw.cast<String>();
@@ -292,10 +295,13 @@ class _MesaScreenState extends State<MesaScreen> {
           final String turnoAtual = dados['turno_atual'] ?? '';
           final bool ehMinhaVez = turnoAtual == widget.meuNome;
 
-          final eu = jogadores[widget.meuNome];
+          final eu = jogadores[widget.meuNome] ?? {};
           final List<dynamic> minhaMaoRaw = eu['cartas'] ?? [];
           final int meuPalpite = eu['palpite'] ?? -1;
           final int rodadaAtual = dados['rodada_atual'] ?? 1;
+
+          // BUG FIX: lê as próprias vidas do Firebase
+          final int minhasVidas = (eu['vidas'] as int?) ?? metaPontos;
 
           int totalVazasMesa = 0;
           jogadores.forEach((k, v) {
@@ -309,7 +315,7 @@ class _MesaScreenState extends State<MesaScreen> {
               totalVazasMesa;
           final bool ehRodadaCega = qtdCartasNestaRodada == 1;
 
-          // Palpite proibido (fodinha)
+          // Palpite proibido
           int palpiteProibido = -1;
           if (ordemJogadores.isNotEmpty) {
             final int indexQuemComecou =
@@ -329,7 +335,7 @@ class _MesaScreenState extends State<MesaScreen> {
             }
           }
 
-          // Ordem visual (você sempre primeiro)
+          // Ordem visual
           int meuIndex = ordemJogadores.indexOf(widget.meuNome);
           List<String> ordemVisual = meuIndex != -1
               ? [
@@ -338,7 +344,7 @@ class _MesaScreenState extends State<MesaScreen> {
                 ]
               : ordemJogadores;
 
-          // Detecta nova rodada pela mudança da vira → aciona embaralhar
+          // Detecta nova rodada → aciona embaralhar
           final String? viraKey = dados['vira']?.toString();
           if (viraKey != null &&
               _ultimaViraKey != null &&
@@ -349,16 +355,16 @@ class _MesaScreenState extends State<MesaScreen> {
           }
           _ultimaViraKey = viraKey;
 
-          // ── Layout ──────────────────────────────────────────────────────────
+          // ── Layout ─────────────────────────────────────────────────────────
           return Column(
             children: [
-              // Área da mesa
+              // Mesa
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return Stack(
                       children: [
-                        // Mesa verde
+                        // Feltro verde
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 20),
@@ -374,13 +380,14 @@ class _MesaScreenState extends State<MesaScreen> {
                               ),
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
-                                color: Colors.amber.withValues(alpha: 0.5),
+                                color:
+                                    Colors.amber.withValues(alpha: 0.5),
                                 width: 3,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      Colors.black.withValues(alpha: 0.6),
+                                  color: Colors.black
+                                      .withValues(alpha: 0.6),
                                   blurRadius: 15,
                                   spreadRadius: 2,
                                   offset: const Offset(0, 5),
@@ -390,38 +397,37 @@ class _MesaScreenState extends State<MesaScreen> {
                           ),
                         ),
 
-                        // Adversários em círculo
+                        // Adversários
                         ...ordemVisual.asMap().entries.map((entry) {
-                          if (entry.key == 0) return const SizedBox.shrink();
+                          if (entry.key == 0) {
+                            return const SizedBox.shrink();
+                          }
                           final jog = jogadores[entry.value] ?? {};
                           return _posicionarJogador(
                             entry.key,
                             ordemVisual.length,
                             constraints.maxWidth,
                             constraints.maxHeight,
-                            _buildAvatarAdversario(
-                                entry.value, jog, turnoAtual == entry.value),
+                            _buildAvatarAdversario(entry.value, jog,
+                                turnoAtual == entry.value),
                           );
                         }),
 
-                        // Centro da mesa: baralho + vira + cartas jogadas
+                        // Centro: baralho + vira + cartas jogadas
                         Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Baralho com animação de embaralhar
                               DeckWidget(
                                 embaralhando: _embaralhando,
                                 onEmbaralhadoConcluido: () {
                                   if (mounted) {
-                                    setState(() => _embaralhando = false);
+                                    setState(
+                                        () => _embaralhando = false);
                                   }
                                 },
                               ),
-
                               const SizedBox(height: 8),
-
-                              // Vira com flip 3D
                               if (dados['vira'] != null) ...[
                                 const Text(
                                   "VIRA",
@@ -433,22 +439,20 @@ class _MesaScreenState extends State<MesaScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 5),
-                                // Key baseada na vira para forçar recriação
-                                // do widget (e reexecutar a animação) a cada rodada
                                 ViraAnimadaWidget(
-                                  key: ValueKey(dados['vira'].toString()),
+                                  key: ValueKey(
+                                      dados['vira'].toString()),
                                   carta: Carta.fromMap(dados['vira']),
                                 ),
                                 const SizedBox(height: 16),
                               ],
-
-                              // Cartas na mesa com animação de entrada
                               if (cartasNaMesa.isNotEmpty)
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 10,
                                   alignment: WrapAlignment.center,
-                                  children: cartasNaMesa.entries.map((e) {
+                                  children: cartasNaMesa.entries
+                                      .map<Widget>((e) {
                                     final Carta c =
                                         Carta.fromMap(e.value);
                                     return CartaMesaWidget(
@@ -488,22 +492,54 @@ class _MesaScreenState extends State<MesaScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Indicador de vez
-                    Text(
-                      ehMinhaVez
-                          ? "Sua vez!"
-                          : "Aguarde a vez de: $turnoAtual",
-                      style: TextStyle(
-                        color: ehMinhaVez
-                            ? const Color(0xFF00FF9D)
-                            : Colors.amber,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    // Status: vez + vidas próprias
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          ehMinhaVez
+                              ? "Sua vez!"
+                              : "Vez de: $turnoAtual",
+                          style: TextStyle(
+                            color: ehMinhaVez
+                                ? const Color(0xFF00FF9D)
+                                : Colors.amber,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        // BUG FIX: exibe as próprias vidas
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: minhasVidas <= 3
+                                ? Colors.red.withValues(alpha: 0.3)
+                                : Colors.white10,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: minhasVidas <= 3
+                                  ? Colors.redAccent
+                                  : Colors.white24,
+                            ),
+                          ),
+                          child: Text(
+                            "❤️ $minhasVidas",
+                            style: TextStyle(
+                              color: minhasVidas <= 3
+                                  ? Colors.redAccent
+                                  : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+
                     const SizedBox(height: 15),
 
-                    // Palpites / status
+                    // Palpites
                     if (fase == 'palpites' && meuPalpite == -1) ...[
                       const Text(
                         "QUANTAS VAZAS VOCÊ VAI FAZER?",
@@ -520,14 +556,15 @@ class _MesaScreenState extends State<MesaScreen> {
                             return ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isProibido
-                                    ? Colors.red.withValues(alpha: 0.2)
+                                    ? Colors.red
+                                        .withValues(alpha: 0.2)
                                     : Colors.white12,
                                 shape: const CircleBorder(),
                                 padding: const EdgeInsets.all(15),
                               ),
                               onPressed: (ehMinhaVez && !isProibido)
-                                  ? () => _confirmarPalpite(
-                                      index, ordemJogadores, rodadaAtual)
+                                  ? () => _confirmarPalpite(index,
+                                      ordemJogadores, rodadaAtual)
                                   : null,
                               child: Text(
                                 "$index",
@@ -545,7 +582,8 @@ class _MesaScreenState extends State<MesaScreen> {
                           },
                         ),
                       ),
-                    ] else if (fase == 'palpites' && meuPalpite != -1) ...[
+                    ] else if (fase == 'palpites' &&
+                        meuPalpite != -1) ...[
                       Text(
                         "SEU PALPITE: $meuPalpite",
                         style: const TextStyle(
@@ -554,8 +592,8 @@ class _MesaScreenState extends State<MesaScreen> {
                       const SizedBox(height: 5),
                       const Text(
                         "Aguardando os outros jogadores...",
-                        style:
-                            TextStyle(color: Colors.amber, fontSize: 12),
+                        style: TextStyle(
+                            color: Colors.amber, fontSize: 12),
                       ),
                     ] else ...[
                       Text(
@@ -567,7 +605,6 @@ class _MesaScreenState extends State<MesaScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Sua mão de cartas
                     const Text(
                       "SUA MÃO",
                       style: TextStyle(
@@ -577,9 +614,12 @@ class _MesaScreenState extends State<MesaScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
+
+                    // Cartas da mão
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: minhaMaoRaw.asMap().entries.map((entry) {
+                      children:
+                          minhaMaoRaw.asMap().entries.map((entry) {
                         final Carta c = Carta.fromMap(entry.value);
                         final bool jaJoguei =
                             cartasNaMesa.containsKey(widget.meuNome);
@@ -588,14 +628,17 @@ class _MesaScreenState extends State<MesaScreen> {
                             !jaJoguei;
 
                         return Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6),
                           child: ehRodadaCega
-                              // Carta cega (❓)
                               ? GestureDetector(
                                   onTap: podeJogar
-                                      ? () => _jogarCarta(c, entry.key,
-                                          minhaMaoRaw, ordemJogadores)
+                                      ? () => _jogarCarta(
+                                          c,
+                                          entry.key,
+                                          minhaMaoRaw,
+                                          ordemJogadores,
+                                          metaPontos)
                                       : null,
                                   child: Opacity(
                                     opacity: podeJogar ? 1.0 : 0.4,
@@ -603,7 +646,8 @@ class _MesaScreenState extends State<MesaScreen> {
                                       width: 60,
                                       height: 90,
                                       decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
+                                        gradient:
+                                            const LinearGradient(
                                           colors: [
                                             Colors.blueGrey,
                                             Colors.black87
@@ -619,23 +663,31 @@ class _MesaScreenState extends State<MesaScreen> {
                                       ),
                                       child: const Center(
                                         child: Text("❓",
-                                            style:
-                                                TextStyle(fontSize: 30)),
+                                            style: TextStyle(
+                                                fontSize: 30)),
                                       ),
                                     ),
                                   ),
                                 )
-                              // Carta normal com animação
+                              // BUG FIX: seleção única via _cartaSelecionadaIndex
                               : CartaWidget(
                                   key: ValueKey(
                                       '${entry.key}_${c.valor}_${c.naipe.index}'),
                                   carta: c,
+                                  indexNaMao: entry.key,
                                   podeSelecionada: podeJogar,
+                                  cartaSelecionadaIndex:
+                                      _cartaSelecionadaIndex,
+                                  onSelecionada: (idx) {
+                                    setState(() =>
+                                        _cartaSelecionadaIndex = idx);
+                                  },
                                   onJogar: () => _jogarCarta(
                                       c,
                                       entry.key,
                                       minhaMaoRaw,
-                                      ordemJogadores),
+                                      ordemJogadores,
+                                      metaPontos),
                                 ),
                         );
                       }).toList(),
@@ -652,7 +704,7 @@ class _MesaScreenState extends State<MesaScreen> {
   }
 }
 
-// ─── Helpers (funções de layout e avatar) ──────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 Widget _posicionarJogador(
   int index,
@@ -664,20 +716,14 @@ Widget _posicionarJogador(
   final double anguloInicial = 90 * (math.pi / 180);
   final double variacaoAngulo = (2 * math.pi) / total;
   final double angulo = anguloInicial + (index * variacaoAngulo);
-
   final double raioX = largura * 0.35;
   final double raioY = altura * 0.35;
   final double centroX = largura / 2;
   final double centroY = altura / 2;
-
   final double x = centroX + raioX * math.cos(angulo);
   final double y = centroY + raioY * math.sin(angulo);
 
-  return Positioned(
-    left: x - 60,
-    top: y - 50,
-    child: filho,
-  );
+  return Positioned(left: x - 60, top: y - 50, child: filho);
 }
 
 Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
@@ -689,7 +735,6 @@ Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
   return Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      // Card de status
       Container(
         padding:
             const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -734,10 +779,7 @@ Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
           ],
         ),
       ),
-
       const SizedBox(height: 8),
-
-      // Leque de cartas do adversário
       SizedBox(
         height: 50,
         width: 80,
@@ -745,7 +787,8 @@ Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
           alignment: Alignment.topCenter,
           children: List.generate(cartasNaMao, (i) {
             return Transform.translate(
-              offset: Offset((i - (cartasNaMao - 1) / 2) * 15, 0),
+              offset:
+                  Offset((i - (cartasNaMao - 1) / 2) * 15, 0),
               child: Transform.rotate(
                 angle: (i - (cartasNaMao - 1) / 2) * 0.2,
                 child: Container(
@@ -753,7 +796,10 @@ Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
                   height: 45,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF1A237E), Color(0xFF283593)],
+                      colors: [
+                        Color(0xFF1A237E),
+                        Color(0xFF283593)
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -768,7 +814,8 @@ Widget _buildAvatarAdversario(String nome, Map jog, bool ehTurno) {
                     ],
                   ),
                   child: const Center(
-                    child: Text("🃏", style: TextStyle(fontSize: 12)),
+                    child:
+                        Text("🃏", style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ),

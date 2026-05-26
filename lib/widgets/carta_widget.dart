@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 import '../models/carta_model.dart';
 
 /// Carta na mão do jogador.
-/// Primeiro toque: levanta a carta (selecionada).
-/// Segundo toque: confirma e joga.
+/// [cartaSelecionadaIndex] controla qual carta está selecionada globalmente
+/// (apenas uma por vez). Passa -1 se nenhuma estiver selecionada.
 class CartaWidget extends StatefulWidget {
   final Carta carta;
+  final int indexNaMao;
   final bool podeSelecionada;
+  final int cartaSelecionadaIndex;
+  final ValueChanged<int> onSelecionada; // notifica o pai do índice selecionado
   final VoidCallback? onJogar;
 
   const CartaWidget({
     super.key,
     required this.carta,
+    required this.indexNaMao,
     required this.podeSelecionada,
+    required this.cartaSelecionadaIndex,
+    required this.onSelecionada,
     this.onJogar,
   });
 
@@ -25,7 +31,9 @@ class _CartaWidgetState extends State<CartaWidget>
   late AnimationController _controller;
   late Animation<double> _elevacao;
   late Animation<double> _escala;
-  bool _selecionada = false;
+
+  bool get _selecionada =>
+      widget.cartaSelecionadaIndex == widget.indexNaMao;
 
   @override
   void initState() {
@@ -45,9 +53,9 @@ class _CartaWidgetState extends State<CartaWidget>
   @override
   void didUpdateWidget(CartaWidget old) {
     super.didUpdateWidget(old);
-    // Se o widget foi reconstruído e não pode mais ser selecionado, reseta
-    if (!widget.podeSelecionada && _selecionada) {
-      _selecionada = false;
+    if (_selecionada && !_controller.isCompleted) {
+      _controller.forward();
+    } else if (!_selecionada && _controller.value > 0) {
       _controller.reverse();
     }
   }
@@ -62,10 +70,10 @@ class _CartaWidgetState extends State<CartaWidget>
     if (!widget.podeSelecionada) return;
 
     if (!_selecionada) {
-      setState(() => _selecionada = true);
-      _controller.forward();
+      // Seleciona esta carta (deseleciona qualquer outra via callback)
+      widget.onSelecionada(widget.indexNaMao);
     } else {
-      // Segundo toque: joga a carta
+      // Segunda toque: confirma e joga
       widget.onJogar?.call();
     }
   }
@@ -146,7 +154,7 @@ class _CartaWidgetState extends State<CartaWidget>
                     ),
                   ),
 
-                  // Badge "JOGAR" quando selecionada
+                  // Badge "JOGAR"
                   if (_selecionada)
                     Positioned(
                       bottom: -10,
@@ -186,7 +194,7 @@ class _CartaWidgetState extends State<CartaWidget>
   }
 }
 
-/// Carta jogada na mesa — entra com animação de deslize de baixo para cima.
+/// Carta jogada na mesa com animação de entrada.
 class CartaMesaWidget extends StatefulWidget {
   final Carta carta;
   final String? rotulo;
@@ -226,7 +234,6 @@ class _CartaMesaWidgetState extends State<CartaMesaWidget>
       ),
     );
 
-    // Leve rotação aleatória para parecer mais natural
     final seed = widget.carta.valor + widget.carta.naipe.index;
     final angulo = ((seed % 7) - 3) * 0.025;
     _rotacao = Tween<double>(begin: 0, end: angulo).animate(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'lobby_screen.dart';
+import 'logo_unificado.dart'; // Importe o componente do logo unificado
+// Importe a Splash para a navegação
 
 class TelaInicial extends StatefulWidget {
   const TelaInicial({super.key});
@@ -79,12 +81,15 @@ class _TelaInicialState extends State<TelaInicial> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 40),
-            const Icon(Icons.style, size: 80, color: Colors.amber),
-            const SizedBox(height: 20),
-            const Text(
-              "TRUCO RL",
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+
+            // Aqui está a mágica: o Hero agora abraça tudo!
+            // Ele vai receber o componente gigante da Splash e encolher para este tamanho.
+            const Hero(
+              tag:
+                  'logo_completo_hero', // IMPORTANTE: tem que ser a mesma tag da Splash
+              child: LogoUnificado(cardSize: 60, textSize: 32),
             ),
+
             const SizedBox(height: 40),
 
             // Alternador Criar/Entrar
@@ -139,7 +144,8 @@ class _TelaInicialState extends State<TelaInicial> {
                   foregroundColor: Colors.amber,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: _abrirComoJogar,
+                onPressed:
+                    _abrirComoJogar, // Certifique-se de que este método existe no seu arquivo
                 icon: const Icon(Icons.help_outline),
                 label: const Text("COMO JOGAR"),
               ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:truco_rl/screens/tela_inicial.dart';
+import 'package:truco_rl/screens/splash_screen.dart';
 import 'firebase_options.dart'; // O arquivo que o CLI acabou de criar
 
 void main() async {
@@ -28,7 +28,7 @@ class TrucoRL extends StatelessWidget {
         ),
       ),
       // Por enquanto, vamos apontar para um Placeholder até criarmos a tela
-      home: const TelaInicial(),
+      home: const SplashScreen(),
     );
   }
 }

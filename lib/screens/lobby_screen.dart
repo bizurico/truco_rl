@@ -20,8 +20,7 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
-  final TextEditingController _pontosCustomController =
-      TextEditingController();
+  final TextEditingController _pontosCustomController = TextEditingController();
 
   @override
   void dispose() {
@@ -44,8 +43,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       body: StreamBuilder(
         stream: salaRef.onValue,
         builder: (context, snapshot) {
-          if (!snapshot.hasData ||
-              snapshot.data!.snapshot.value == null) {
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -81,12 +79,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
             });
 
             return const Center(
-              child: CircularProgressIndicator(
-                  color: Color(0xFF00FF9D)),
+              child: CircularProgressIndicator(color: Color(0xFF00FF9D)),
             );
           }
 
           Map jogadores = dados['jogadores'] ?? {};
+          if (jogadores.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              salaRef.remove();
+            });
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white54),
+            );
+          }
           int metaAtual = dados['meta_pontos'] ?? 10;
           int qtdBaralhos = dados['qtd_baralhos'] ?? 1;
 
@@ -129,16 +134,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           ),
                           const SizedBox(width: 10),
                           IconButton(
-                            icon: const Icon(Icons.copy,
-                                color: Color(0xFF00FF9D)),
+                            icon: const Icon(
+                              Icons.copy,
+                              color: Color(0xFF00FF9D),
+                            ),
                             onPressed: () {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text(
-                                      "Código da sala copiado!"),
+                                  content: Text("Código da sala copiado!"),
                                   backgroundColor: Color.fromARGB(
-                                      255, 91, 189, 255),
+                                    255,
+                                    91,
+                                    189,
+                                    255,
+                                  ),
                                 ),
                               );
                             },
@@ -163,7 +172,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     children: [
                       ChoiceChip(
                         label: const Text("5"),
-                        selected: metaAtual == 5 &&
+                        selected:
+                            metaAtual == 5 &&
                             _pontosCustomController.text.isEmpty,
                         onSelected: (_) {
                           _pontosCustomController.clear();
@@ -174,7 +184,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       const SizedBox(width: 10),
                       ChoiceChip(
                         label: const Text("10"),
-                        selected: metaAtual == 10 &&
+                        selected:
+                            metaAtual == 10 &&
                             _pontosCustomController.text.isEmpty,
                         onSelected: (_) {
                           _pontosCustomController.clear();
@@ -192,27 +203,25 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             hintText: "Outro",
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
-                                color: _pontosCustomController
-                                        .text.isNotEmpty
+                                color: _pontosCustomController.text.isNotEmpty
                                     ? Colors.amber
                                     : Colors.white24,
                               ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(
-                                  color: Colors.amber),
+                              borderSide: const BorderSide(color: Colors.amber),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            contentPadding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                           ),
                           onChanged: (val) {
                             final parsed = int.tryParse(val);
                             if (parsed != null && parsed > 0) {
-                              salaRef
-                                  .update({'meta_pontos': parsed});
+                              salaRef.update({'meta_pontos': parsed});
                             }
                             setState(() {});
                           },
@@ -235,8 +244,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           onSelected: (_) =>
                               salaRef.update({'qtd_baralhos': 1}),
                         ),
-                      if (jogadores.length >= 4 &&
-                          jogadores.length < 6)
+                      if (jogadores.length >= 4 && jogadores.length < 6)
                         const SizedBox(width: 10),
                       if (jogadores.length >= 4)
                         ChoiceChip(
@@ -250,14 +258,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ] else ...[
                   Text(
                     "META DE PONTOS: $metaAtual",
-                    style: const TextStyle(
-                        color: Colors.amber, fontSize: 18),
+                    style: const TextStyle(color: Colors.amber, fontSize: 18),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     "BARALHOS NA MESA: $qtdBaralhos",
-                    style: const TextStyle(
-                        color: Colors.white70, fontSize: 14),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
 
@@ -265,8 +271,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                 Text(
                   "JOGADORES (${jogadores.length}/4)",
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 20),
+                  style: const TextStyle(color: Colors.white, fontSize: 20),
                 ),
 
                 Expanded(
@@ -274,17 +279,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     children: jogadores.keys
                         .map(
                           (nome) => ListTile(
-                            leading: const Icon(Icons.person,
-                                color: Color(0xFF00FF9D)),
+                            leading: const Icon(
+                              Icons.person,
+                              color: Color(0xFF00FF9D),
+                            ),
                             title: Text(
                               nome.toString(),
-                              style: const TextStyle(
-                                  color: Colors.white),
+                              style: const TextStyle(color: Colors.white),
                             ),
                             trailing: nome == widget.meuNome
-                                ? const Text("(Você)",
-                                    style: TextStyle(
-                                        color: Colors.white54))
+                                ? const Text(
+                                    "(Você)",
+                                    style: TextStyle(color: Colors.white54),
+                                  )
                                 : null,
                           ),
                         )
@@ -300,14 +307,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () async {
-                      List<String> nomes =
-                          jogadores.keys.cast<String>().toList();
+                      List<String> nomes = jogadores.keys
+                          .cast<String>()
+                          .toList();
 
                       // Aplica a meta_pontos como vidas iniciais de todos
                       Map<String, dynamic> vidasUpdate = {};
                       for (String nome in nomes) {
-                        vidasUpdate['jogadores/$nome/vidas'] =
-                            metaAtual;
+                        vidasUpdate['jogadores/$nome/vidas'] = metaAtual;
                       }
                       await salaRef.update(vidasUpdate);
 

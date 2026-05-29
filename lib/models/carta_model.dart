@@ -28,13 +28,13 @@ class Carta {
   static String _mapearNaipe(Naipe n) {
     switch (n) {
       case Naipe.ouros:
-        return '♦️';
+        return '♦'; // U+2666 (Texto puro)
       case Naipe.espadas:
-        return '♠️';
+        return '♠'; // U+2660 (Texto puro)
       case Naipe.copas:
-        return '♥️';
+        return '♥'; // U+2665 (Texto puro)
       case Naipe.paus:
-        return '♣️';
+        return '♣'; // U+2663 (Texto puro)
     }
   }
 }

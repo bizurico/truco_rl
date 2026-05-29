@@ -20,35 +20,45 @@ class _TelaInicialState extends State<TelaInicial> {
 
     if (nome.isEmpty || sala.isEmpty) return;
 
-    DatabaseReference salaRef =
-        FirebaseDatabase.instance.ref("salas/$sala");
+    DatabaseReference salaRef = FirebaseDatabase.instance.ref("salas/$sala");
 
     if (isCriando) {
+      // HOST: Cria a sala do zero
       await salaRef.set({
         'status': 'aguardando',
-        'meta_pontos': 10, // padrão, alterável no lobby
+        'meta_pontos': 10,
         'jogadores': {
           nome: {'pontos': 0, 'palpite': -1, 'vidas': 10},
         },
       });
     } else {
-      // Ao entrar, lê a meta_pontos da sala para inicializar as vidas corretamente
-      final snap = await salaRef.child('meta_pontos').get();
-      final int meta = (snap.value as int?) ?? 10;
-      await salaRef
-          .child("jogadores/$nome")
-          .set({'pontos': 0, 'palpite': -1, 'vidas': meta});
+      // CONVIDADO: Primeiro verifica se a sala existe!
+      final snapshot = await salaRef.get();
+
+      if (!snapshot.exists) {
+        // Exibe um erro amigável se a sala não for encontrada
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Erro: Esta sala não existe!")),
+        );
+        return; // Interrompe a execução aqui, não entra na mesa
+      }
+
+      // Se existe, prossegue com a entrada
+      final int meta = (snapshot.child('meta_pontos').value as int?) ?? 10;
+      await salaRef.child("jogadores/$nome").set({
+        'pontos': 0,
+        'palpite': -1,
+        'vidas': meta,
+      });
     }
 
     if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LobbyScreen(
-          salaId: sala,
-          meuNome: nome,
-          souHost: isCriando,
-        ),
+        builder: (context) =>
+            LobbyScreen(salaId: sala, meuNome: nome, souHost: isCriando),
       ),
     );
   }
@@ -73,8 +83,7 @@ class _TelaInicialState extends State<TelaInicial> {
             const SizedBox(height: 20),
             const Text(
               "TRUCO RL",
-              style:
-                  TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 40),
 
@@ -85,15 +94,13 @@ class _TelaInicialState extends State<TelaInicial> {
                 ChoiceChip(
                   label: const Text("Criar"),
                   selected: isCriando,
-                  onSelected: (val) =>
-                      setState(() => isCriando = true),
+                  onSelected: (val) => setState(() => isCriando = true),
                 ),
                 const SizedBox(width: 10),
                 ChoiceChip(
                   label: const Text("Entrar"),
                   selected: !isCriando,
-                  onSelected: (val) =>
-                      setState(() => isCriando = false),
+                  onSelected: (val) => setState(() => isCriando = false),
                 ),
               ],
             ),
@@ -101,21 +108,18 @@ class _TelaInicialState extends State<TelaInicial> {
             const SizedBox(height: 20),
             TextField(
               controller: _nomeController,
-              decoration:
-                  const InputDecoration(labelText: "Seu Nome"),
+              decoration: const InputDecoration(labelText: "Seu Nome"),
             ),
             TextField(
               controller: _salaController,
-              decoration:
-                  const InputDecoration(labelText: "Nome da Sala"),
+              decoration: const InputDecoration(labelText: "Nome da Sala"),
             ),
             const SizedBox(height: 30),
 
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
                 onPressed: _entrarNaMesa,
                 child: Text(
                   isCriando ? "CRIAR MESA" : "ENTRAR NA MESA",
@@ -224,8 +228,7 @@ class ComoJogarScreen extends StatelessWidget {
           _Secao(
             titulo: "REGRAS ESPECIAIS",
             icone: Icons.library_books,
-            conteudo:
-                "Com 2 baralhos, manilhas de naipes iguais se anulam.",
+            conteudo: "Com 2 baralhos, manilhas de naipes iguais se anulam.",
           ),
           SizedBox(height: 20),
           Center(
